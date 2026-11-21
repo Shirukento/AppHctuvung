@@ -25,6 +25,7 @@ button.alt{background:#34505f}
 <button data-t="D">D. B sau tiếng bíp</button>
 <button data-t="E">E. B sau giọng đọc mẫu</button>
 <button data-t="F">F. B giọng Anh-Anh</button>
+<button class="alt" id="raw">G. Thử micro (không nhận dạng)</button>
 <button class="alt" id="clr">Xoá nhật ký</button>
 <button class="alt" id="info">Thông tin máy</button>
 </div>
@@ -63,6 +64,12 @@ async function run(k){
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>run(b.dataset.t));
 document.getElementById('clr').onclick=()=>{L.innerHTML='';t0=0};
 document.getElementById('info').onclick=()=>{t0=0;log('');log(navigator.userAgent,'dim');log('SpeechRecognition: '+(window.SpeechRecognition?'có (chuẩn)':window.webkitSpeechRecognition?'có (webkit)':'không'),'dim');log('Giọng đọc: '+speechSynthesis.getVoices().length,'dim')};
+document.getElementById('raw').onclick=async()=>{t0=0;log('');log('=== Thử G: mở micro trực tiếp 5 giây, hãy nói','dim');t0=performance.now();
+ try{const s=await navigator.mediaDevices.getUserMedia({audio:true});log('mở micro OK: '+s.getAudioTracks().map(t=>t.label||'micro').join(', '),'ok');
+  const A=window.AudioContext||window.webkitAudioContext;const ac=new A();const an=ac.createAnalyser();an.fftSize=512;ac.createMediaStreamSource(s).connect(an);const b=new Uint8Array(512);let mx=0;
+  const end=performance.now()+5000;while(performance.now()<end){await new Promise(r=>setTimeout(r,100));an.getByteTimeDomainData(b);let q=0;for(const v of b)q+=(v-128)*(v-128);mx=Math.max(mx,Math.sqrt(q/b.length))}
+  s.getTracks().forEach(t=>t.stop());ac.close();log('độ lớn âm thanh cao nhất: '+mx.toFixed(1)+(mx>3?'  → micro thu được tiếng':'  → micro im lặng, không thu được tiếng'),mx>3?'ok':'bad')
+ }catch(e){log('KHÔNG mở được micro: '+e.name+' – '+e.message,'bad')}};
 </script>
 </body>
 </html>
