@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiểm tra micro Voc Hub</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#14202a;color:#eef3f6}
+h1{font-size:20px;margin:0 0 6px}
+p{margin:4px 0 12px;color:#b9c7cf;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font-size:15px;padding:12px 8px;border-radius:10px;border:0;background:#0E7C70;color:#fff;font-weight:600}
+button.alt{background:#34505f}
+#log{margin-top:12px;background:#0b141a;border-radius:10px;padding:10px;font:12.5px/1.45 ui-monospace,monospace;white-space:pre-wrap;min-height:220px}
+.ok{color:#7be07b}.bad{color:#ff8a7a}.dim{color:#8aa0ad}
+</style>
+</head>
+<body>
+<h1>Kiểm tra micro – Voc Hub</h1>
+<p>Bấm từng nút, sau đó đọc to chữ <b>"scissors"</b> ngay. Làm hết 6 nút rồi chụp màn hình phần nhật ký gửi lại.</p>
+<div class="grid">
+<button data-t="A">A. Giống trang demo</button>
+<button data-t="B">B. Giống Voc Hub</button>
+<button data-t="C">C. B + 1 phương án</button>
+<button data-t="D">D. B sau tiếng bíp</button>
+<button data-t="E">E. B sau giọng đọc mẫu</button>
+<button data-t="F">F. B giọng Anh-Anh</button>
+<button class="alt" id="clr">Xoá nhật ký</button>
+<button class="alt" id="info">Thông tin máy</button>
+</div>
+<div id="log"></div>
+<script>
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const L=document.getElementById('log');let t0=0;
+function log(s,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=(t0?('+'+((performance.now()-t0)/1000).toFixed(1)+'s ').padEnd(8):'')+s;L.appendChild(d);d.scrollIntoView({block:'nearest'})}
+const CFG={
+ A:{continuous:true,interim:true,max:1,lang:'en-US'},
+ B:{continuous:false,interim:true,max:6,lang:'en-US'},
+ C:{continuous:false,interim:true,max:1,lang:'en-US'},
+ D:{continuous:false,interim:true,max:6,lang:'en-US',beep:true},
+ E:{continuous:false,interim:true,max:6,lang:'en-US',tts:true},
+ F:{continuous:false,interim:true,max:6,lang:'en-GB'}
+};
+let cur=null;
+function beep(){return new Promise(r=>{try{const A=window.AudioContext||window.webkitAudioContext;const ac=new A();const o=ac.createOscillator(),g=ac.createGain();g.gain.value=.15;o.frequency.value=880;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.12);setTimeout(r,150)}catch(e){log('beep lỗi: '+e,'bad');r()}})}
+function tts(){return new Promise(r=>{try{const u=new SpeechSynthesisUtterance('scissors');u.lang='en-US';u.onend=()=>{speechSynthesis.cancel();r()};u.onerror=()=>r();speechSynthesis.speak(u);setTimeout(r,3000)}catch(e){log('TTS lỗi: '+e,'bad');r()}})}
+async function run(k){
+ if(!SR){log('Trình duyệt không có SpeechRecognition','bad');return}
+ if(cur){try{cur.abort()}catch(e){}cur=null}
+ const c=CFG[k];t0=0;log('');log('=== Thử '+k+' ('+JSON.stringify(c)+')','dim');
+ if(c.beep){log('phát tiếng bíp…');await beep()}
+ if(c.tts){log('đọc mẫu "scissors"…');await tts();speechSynthesis.cancel()}
+ const r=new SR();cur=r;r.lang=c.lang;r.continuous=c.continuous;r.interimResults=c.interim;r.maxAlternatives=c.max;
+ let heard=false;t0=performance.now();
+ ['start','audiostart','soundstart','speechstart','speechend','soundend','audioend','nomatch'].forEach(ev=>r['on'+ev]=()=>log(ev,'dim'));
+ r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const R=e.results[i];const alts=[];for(let j=0;j<R.length;j++)alts.push(R[j].transcript+(R[j].confidence?(' ('+R[j].confidence.toFixed(2)+')'):''));heard=true;log((R.isFinal?'KẾT QUẢ: ':'tạm: ')+alts.join(' | '),R.isFinal?'ok':'')}
+  if(c.continuous){let f=false;for(const R of e.results)if(R.isFinal)f=true;if(f)try{r.stop()}catch(x){}}};
+ r.onerror=e=>log('LỖI: '+e.error+(e.message?(' – '+e.message):''),'bad');
+ r.onend=()=>{log('end'+(heard?'':' (không nghe được gì)'),heard?'ok':'bad');cur=null};
+ try{r.start();log('đã gọi start(), hãy đọc to "scissors"')}catch(e){log('start lỗi: '+e,'bad')}
+ setTimeout(()=>{if(cur===r){log('quá 10 giây, gọi stop()','dim');try{r.stop()}catch(e){}}},10000);
+}
+document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>run(b.dataset.t));
+document.getElementById('clr').onclick=()=>{L.innerHTML='';t0=0};
+document.getElementById('info').onclick=()=>{t0=0;log('');log(navigator.userAgent,'dim');log('SpeechRecognition: '+(window.SpeechRecognition?'có (chuẩn)':window.webkitSpeechRecognition?'có (webkit)':'không'),'dim');log('Giọng đọc: '+speechSynthesis.getVoices().length,'dim')};
+</script>
+</body>
+</html>
